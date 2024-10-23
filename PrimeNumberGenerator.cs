@@ -1,51 +1,85 @@
 ﻿using System.Collections;
+using System.Numerics;
 
 namespace MathCrap
 {
-    internal struct PrimeNumberGenerator() : IEnumerable<int>
+    internal struct PrimeNumberGenerator<T>() : IReadOnlyList<T> where T : struct,
+        IComparable,
+        IConvertible,
+        ISpanFormattable,
+        IComparable<T>,
+        IEquatable<T>,
+        IBinaryInteger<T>,
+        IMinMaxValue<T>,
+        IUtf8SpanFormattable
     {
-        int currentIndex { get; set; } = 0;
+        static readonly List<ulong> cache = [2, 3];
 
-        public static IReadOnlyList<int> Cache => cache;
+        int IReadOnlyCollection<T>.Count => Count;
 
-        static List<int> cache { get; }
-
-        static PrimeNumberGenerator()
+        public static int Count
         {
-            cache = [2, 3];
+            get
+            {
+                int index = cache.FindIndex((ulong number) => number > T.MaxValue.ToUInt64(null));
+                return index > 0 ? index : cache.Count;
+            }
         }
 
-        public IEnumerator<int> GetEnumerator()
+        public T this[int index] => Get(index);
+
+        public static T Get(int index) => T.CreateChecked(cache[index]);
+
+        public IEnumerator<T> GetEnumerator()
         {
-            int potentialNextPrime = 5;
-            while (potentialNextPrime > 0)
+            ulong maxValue = T.MaxValue.ToUInt64(null);
+            int currentIndex = 0;
+            bool reachedLimit = false;
+            while (!reachedLimit)
             {
                 if (currentIndex < cache.Count)
                 {
-                    yield return cache[currentIndex++];
+                    if (cache[currentIndex] <= maxValue)
+                    {
+                        yield return T.CreateChecked(cache[currentIndex++]);
+                    }
+                    else
+                    {
+                        reachedLimit = true;
+                    }
                 }
                 else
                 {
-                    potentialNextPrime = cache[^1] + 2;
-                    bool newPrimeFound = false;
-                    while (!newPrimeFound)
+                    try
                     {
-                        int denominatorIndex = 2;
-                        int denominator = 3;
-                        int flooredSqrtOfPotentialNextPrime = (int)Math.Sqrt(potentialNextPrime);
-                        while (denominator <= flooredSqrtOfPotentialNextPrime && potentialNextPrime % denominator != 0)
+                        ulong potentialNextPrime = cache[^1] + 2;
+                        bool newPrimeFound = false;
+                        while (!newPrimeFound)
                         {
-                            denominator = denominatorIndex < cache.Count ? cache[denominatorIndex++] : denominator + 2;
+                            int denominatorIndex = 2;
+                            ulong denominator = 3;
+                            ulong flooredSqrtOfPotentialNextPrime = (ulong)Math.Sqrt(potentialNextPrime);
+                            while (denominator <= flooredSqrtOfPotentialNextPrime && potentialNextPrime % denominator != 0)
+                            {
+                                denominator = denominatorIndex < cache.Count ? cache[denominatorIndex++] : denominator + 2;
+                            }
+                            if (denominator > flooredSqrtOfPotentialNextPrime)
+                            {
+                                cache.Add(potentialNextPrime);
+                                newPrimeFound = true;
+                            }
+                            else
+                            {
+                                checked
+                                {
+                                    potentialNextPrime += 2;
+                                }
+                            }
                         }
-                        if (denominator > flooredSqrtOfPotentialNextPrime)
-                        {
-                            cache.Add(potentialNextPrime);
-                            newPrimeFound = true;
-                        }
-                        else
-                        {
-                            potentialNextPrime += 2;
-                        }
+                    }
+                    catch (OverflowException)
+                    {
+                        reachedLimit = true;
                     }
                 }
             }
